@@ -1,22 +1,45 @@
-
-
-#define INET_INTERVAL_RECONNECT 180
-
-
 #if (_INET == 1)
-void handleNewMessages(int numNewMessages) {
-static uint16_t INET_CNT = 0;
-  if (WiFi.status() == WL_CONNECTED) {
-    tft.fillRect(289, 1, 30, 30, ILI9341_BLACK);
-    tft.drawBitmap(289, 1, WIFI_ON1, 30, 30, ILI9341_BLACK, ILI9341_WHITE);
-  } else {
 
-    tft.fillRect(289, 1, 30, 30, ILI9341_BLACK);
-    tft.drawBitmap(289, 1, WIFI_OFF1, 30, 30, ILI9341_BLACK, ILI9341_WHITE);
-    INET_CNT++;
-    if (INET_CNT > INET_INTERVAL_RECONNECT) {
+/*colors*/
+#define wifi_sensors_background ILI9341_BLACK
+#define wifi_sensors_color ILI9341_WHITE
+/*colors*/
+
+
+/*time values*/
+constexpr uint16_t reconnect_time = 180;  // in sec
+/*time values*/
+
+/*coordinates on diplay*/
+constexpr uint16_t x_start_wifi = 289;
+constexpr uint16_t y_start_wifi = 1;
+/*coordinates on diplay*/
+
+/*bitmap size*/
+constexpr uint8_t w_wifi = 30;
+constexpr uint8_t h_wifi = 30;
+/*bitmap size*/
+
+void init_inet() {
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  client.setCACert(TELEGRAM_CERTIFICATE_ROOT);  // Add root certificate for api.telegram.org
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+    Serial.println("Connecting to WiFi..");
+  }
+}
+void handleNewMessages(int numNewMessages) {
+  static uint16_t cnt = 0;
+  if (WiFi.status() == WL_CONNECTED) {
+    tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_on, w_wifi, h_wifi, wifi_sensors_background, wifi_sensors_color);
+  } else {
+    tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_off, w_wifi, h_wifi, wifi_sensors_color, wifi_sensors_background);
+    cnt++;
+    if (cnt > reconnect_time) {
       WiFi.begin(ssid, password);
-      INET_CNT = 0;
+      cnt = 0;
     }
   }
 
@@ -44,7 +67,7 @@ static uint16_t INET_CNT = 0;
       welcome += "/check_kitchen для проверики датчиков на кухне \n";
       bot.sendMessage(chat_id, welcome, "");
     }
-        if (text == "/beep") {
+    if (text == "/beep") {
       beep();
     }
 
@@ -58,13 +81,13 @@ static uint16_t INET_CNT = 0;
           message += "Качество воздуха в кухне отличное \n";
           break;
         case AIR_SENSOR_STATUS_OK:
-          message +="Качество воздуха в кухне хорошее \n";
+          message += "Качество воздуха в кухне хорошее \n";
           break;
         case AIR_SENSOR_STATUS_NORMAL:
-          message +="Качество воздуха в кухне нормальное \n";
+          message += "Качество воздуха в кухне нормальное \n";
           break;
         case AIR_SENSOR_STATUS_BAD:
-          message +="Качество воздуха в кухне плохое \n";
+          message += "Качество воздуха в кухне плохое \n";
           break;
         case AIR_SENSOR_STATUS_VERY_BAD:
           message += "Качество воздуха в кухне ужасное/опасность! \n";
@@ -73,7 +96,7 @@ static uint16_t INET_CNT = 0;
       message += "MQ2 " + String(read_mq2()) + " ppm \n";
       message += "MQ135 " + String(read_mq135()) + " ppm \n";
       ////
-      if (active_pir_sensor()) {  
+      if (active_pir_sensor()) {
         message += "В кухне кто-то есть \n";
       } else {
         message += "В кухне никого нету \n";
@@ -85,7 +108,7 @@ static uint16_t INET_CNT = 0;
       message += "Под умывальником влажонсть состовляет: " + String(read_water_sensor_3()) + " % \n";
       bot.sendMessage(chat_id, message, "");
 
-    }//// /check_kitchen
+    }  //// /check_kitchen
 
     if (read_water_sensor_3() > read_water_alarm()) {
       bot.sendMessage(chat_id, "ВНИМАНИЕ ПРОТЕЧКА ПОД ХОЛОДИЛЬНИКОМ !!!", "");
@@ -100,7 +123,7 @@ static uint16_t INET_CNT = 0;
       bot.sendMessage(chat_id, "ВНИМАНИЕ ВЫСОКАЯ ТЕМПЕРАТУРА/ВЛАЖОНСТЬ В КУХНЕ !!!", "");
     }
   }
-  //INET_CNT = 0;
+  //cnt = 0;
   //}
 }
 #endif

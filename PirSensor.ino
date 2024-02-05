@@ -1,37 +1,56 @@
 
+#define pir_sensor_pin 26
 
-#define PIR_SENSOR_PIN 26
-#define PIR_SENSOR_INTERVAL 600 //in sec
-uint16_t PIR_SENSOR_CNT = 0;
-bool PIR_SENSOR_AKTIV = 0;
+/*colors*/
+#define pir_sensors_background ILI9341_BLACK
+#define pir_sensors_color ILI9341_WHITE
+/*colors*/
 
+/*time values*/
+uint16_t pir_delay = 180; // in sec
+/*time values*/
+
+/*coordinates on diplay*/
+constexpr uint16_t x_start_pir = 260;
+constexpr uint16_t y_start_pir = 180;
+/*coordinates on diplay*/
+
+/*bitmap size*/
+constexpr uint16_t w_pir = 53;
+constexpr uint16_t h_pir = 53;
+/*bitmap size*/
+
+bool pir_active = 0;
+ 
+ void init_pir(){
+  pinMode(pir_sensor_pin, INPUT); 
+ }
 bool read_pir_sensor(){
-  return digitalRead(PIR_SENSOR_PIN);
+  return digitalRead(pir_sensor_pin);
 }
 bool active_pir_sensor(){
-  return PIR_SENSOR_AKTIV;
+  return pir_active;
 } 
 void pir_sensor_to_display(){// 1 sec interval
+static uint16_t cnt = 0;
   if (read_pir_sensor()) {
     set_brightness(100);
-    tft.drawBitmap(260, 180, PIR_SEN, 53, 53, ILI9341_BLACK, ILI9341_WHITE);
-    PIR_SENSOR_AKTIV = 1;
-    PIR_SENSOR_CNT=0;
+    tft.drawBitmap(x_start_pir, y_start_pir, pir_sensor, w_pir, h_pir, pir_sensors_background, pir_sensors_color);
+    pir_active = 1;
+    cnt=0;
   }else {
-    PIR_SENSOR_CNT++;
-    if(PIR_SENSOR_CNT > PIR_SENSOR_INTERVAL){// 10 min
-      PIR_SENSOR_CNT = PIR_SENSOR_INTERVAL+1;
+    cnt++;
+    if(cnt > pir_delay){// 10 min
+      cnt = pir_delay+1;
       set_brightness(0);
-      PIR_SENSOR_AKTIV = 0;     
-      //
+      pir_active = 0;     
     }
-    //PIR_SENSOR_AKTIV = false;
     tft.fillRect(260, 180, 53, 53, ILI9341_BLACK);
   }
 }
 
 void debug_pir_sensor() {
- if (digitalRead(PIR_SENSOR_PIN) == HIGH) {
+ if (digitalRead(pir_sensor_pin) == HIGH) {
     Serial.println("Somebody is here");   
     }else{
      Serial.println("Nobody is here"); 
