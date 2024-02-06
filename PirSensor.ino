@@ -10,10 +10,10 @@
 uint16_t pir_delay = 180; // in sec
 /*time values*/
 
-/*coordinates on diplay*/
-constexpr uint16_t x_start_pir = 260;
-constexpr uint16_t y_start_pir = 180;
-/*coordinates on diplay*/
+/*coordinates on display*/
+constexpr int16_t x_start_pir = 260;
+constexpr int16_t y_start_pir = 180;
+/*coordinates on display*/
 
 /*bitmap size*/
 constexpr uint16_t w_pir = 53;

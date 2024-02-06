@@ -1,8 +1,8 @@
 #if (_INET == 1)
 
 /*colors*/
-#define wifi_sensors_background ILI9341_BLACK
-#define wifi_sensors_color ILI9341_WHITE
+#define wifi_background ILI9341_BLACK
+#define wifi_color ILI9341_GREEN
 /*colors*/
 
 
@@ -10,14 +10,14 @@
 constexpr uint16_t reconnect_time = 180;  // in sec
 /*time values*/
 
-/*coordinates on diplay*/
-constexpr uint16_t x_start_wifi = 289;
-constexpr uint16_t y_start_wifi = 1;
-/*coordinates on diplay*/
+/*coordinates on display*/
+constexpr int16_t x_start_wifi = 289;
+constexpr int16_t y_start_wifi = 1;
+/*coordinates on display*/
 
 /*bitmap size*/
-constexpr uint8_t w_wifi = 30;
-constexpr uint8_t h_wifi = 30;
+constexpr uint16_t w_wifi = 30;
+constexpr uint16_t h_wifi = 30;
 /*bitmap size*/
 
 void init_inet() {
@@ -33,9 +33,9 @@ void init_inet() {
 void handleNewMessages(int numNewMessages) {
   static uint16_t cnt = 0;
   if (WiFi.status() == WL_CONNECTED) {
-    tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_on, w_wifi, h_wifi, wifi_sensors_background, wifi_sensors_color);
+    tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_on, w_wifi, h_wifi, wifi_background, wifi_color);
   } else {
-    tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_off, w_wifi, h_wifi, wifi_sensors_color, wifi_sensors_background);
+    tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_off, w_wifi, h_wifi, wifi_background, ILI9341_RED);
     cnt++;
     if (cnt > reconnect_time) {
       WiFi.begin(ssid, password);
@@ -69,8 +69,12 @@ void handleNewMessages(int numNewMessages) {
     }
     if (text == "/beep") {
       beep();
+      beep();
     }
-
+    /*if(text == "/set_standby_time"){
+      bot.sendMessage(chat_id, "min value 0 sec max value 65000 sec \n ", "");
+        pir_delay
+    }*/
     //bot.sendMessage(chat_id, "HELLO FROM ESP32", "");
     ////
     if (text == "/check_kitchen") {

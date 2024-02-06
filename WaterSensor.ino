@@ -5,21 +5,21 @@
 
 /*colors*/
 #define water_sensor_background ILI9341_BLACK
-#define water_sensor_color_text ILI9341_WHITE
+#define water_sensor_color_text ILI9341_BLUE
 #define water_sensor_color_alarm ILI9341_RED
 /*colors*/
 
 /*time values*/
-constexpr uint16_t water_interval = 15; // in sec
+constexpr uint16_t water_interval = 15; //15 in sec
 /*time values*/
 
-/*coordinates on diplay*/
-uint16_t x_start_water = 240;
-uint16_t y_interval_water = 23;
-uint16_t y_start_water = 32;
-/*coordinates on diplay*/
+/*coordinates on display*/
+constexpr int16_t x_start_water = 230;
+constexpr int16_t y_interval_water = 22;
+constexpr int16_t y_start_water = 33;
+/*coordinates on display*/
 
-constexpr uint8_t water_alarm = 10;  //in %
+constexpr uint16_t water_alarm = 10;  //in %
 
 /*raw const values*/
 constexpr uint16_t air_value_1 = 4095;    //Wasser Anschlüss
@@ -35,16 +35,19 @@ uint8_t read_water_alarm(){
 }
 uint8_t read_water_sensor(uint16_t analog_value, uint16_t air_value, uint16_t water_value) {
   uint8_t temp = map(analog_value, air_value, water_value, 0, 100);
-  temp = constrain(temp, 1, 99);
+  temp = constrain(temp, 0, 100);
   return temp;
 }
 uint8_t read_water_sensor_1() {
+  //uint16_t temp =random(0,4095);
   return read_water_sensor(analogRead(water_sensor_pin_1), air_value_1, water_value_1);
 }
 uint8_t read_water_sensor_2() {
+  //uint16_t temp =random(0,4095);
   return read_water_sensor(analogRead(water_sensor_pin_2), air_value_2, water_value_2);
 }
 uint8_t read_water_sensor_3() {
+  //uint16_t temp =random(0,4095);
   return read_water_sensor(analogRead(water_sensor_pin_3), air_value_3, water_value_3);
 }
 
@@ -52,27 +55,26 @@ void water_sensor_to_display() {
   static uint16_t cnt = 0;
   cnt++;
   if (cnt > water_interval) {
-    tft.setFont(&FreeSansBold9pt7b);
     if (read_water_sensor_1() > water_alarm) {
       tft.setTextColor(water_sensor_color_alarm);
-      print_int(read_water_sensor_1(), x_start_water, y_start_water);
+      print_value_9(read_water_sensor_1(),"%3.0f%%", x_start_water, y_start_water);
     } else {
       tft.setTextColor(water_sensor_color_text);
-      print_int(read_water_sensor_1(), x_start_water, y_start_water);
+      print_value_9(read_water_sensor_1(),"%3.0f%%", x_start_water, y_start_water);
     }
     if (read_water_sensor_2() > water_alarm) {
       tft.setTextColor(water_sensor_color_alarm);
-      print_int(read_water_sensor_2(), x_start_water, y_start_water + y_interval_water);
+     print_value_9(read_water_sensor_2(),"%3.0f%%", x_start_water, y_start_water+y_interval_water+1);
     } else {
       tft.setTextColor(water_sensor_color_text);
-      print_int(read_water_sensor_2(), x_start_water, y_start_water + y_interval_water);
+      print_value_9(read_water_sensor_2(),"%3.0f%%", x_start_water, y_start_water+y_interval_water+1);
     }
     if (read_water_sensor_3() > water_alarm) {
       tft.setTextColor(water_sensor_color_alarm);
-      print_int(read_water_sensor_3(), x_start_water, y_start_water + y_interval_water * 2);
+      print_value_9(read_water_sensor_3(),"%3.0f%%", x_start_water, y_start_water + y_interval_water * 2);
     } else {
       tft.setTextColor(water_sensor_color_text);
-      print_int(read_water_sensor_3(), x_start_water, y_start_water + y_interval_water * 2);
+      print_value_9(read_water_sensor_3(),"%3.0f%%", x_start_water, y_start_water + y_interval_water * 2);
     }
     cnt = 0;
   }

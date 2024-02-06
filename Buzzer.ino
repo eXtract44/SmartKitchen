@@ -9,10 +9,10 @@ void init_buzzer(){
 }
 
 void buzzer_on() {
-  ledcWrite(0, 10);  //on
+  ledcWrite(0, 10); 
 }
 void buzzer_off() {
-  ledcWrite(0, 0);  //on
+  ledcWrite(0, 0); 
 }
 void alarm() {
   static uint16_t cnt = 0;
