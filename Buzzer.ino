@@ -1,6 +1,7 @@
 
-constexpr uint16_t alarm_interval_off = 5;
-constexpr uint16_t alarm_interval_on = 1;
+constexpr uint16_t alarm_interval_off = 5; //in ticks
+constexpr uint16_t alarm_interval_on = 1;  //in ticks
+
 #define buzzer_sensor_pin 14
 
 void init_buzzer(){

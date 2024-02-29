@@ -74,25 +74,25 @@ void air_sensor_to_display() {
   }
 }
 uint16_t read_mq2(){
-  //uint16_t temp =random(0,655);
   return map(analogRead(MQ2_ANALOG_PIN), MQ2_MIN_DIGIT, MQ2_MAX_DIGIT, MQ2_MIN_PPM, MQ2_MAX_PPM);
 }
 uint16_t read_mq135(){
-  //uint16_t temp =random(0,500);
   return map(analogRead(MQ135_ANALOG_PIN), MQ135_MIN_DIGIT, MQ135_MAX_DIGIT, MQ135_MIN_PPM, MQ135_MAX_PPM);
 }
 uint8_t read_air_status() {
-  if (read_mq135() > MQ135_LVL4 || read_mq2() > MQ2_LVL4) {
+  uint16_t temp_mq135 = read_mq135();
+  uint16_t temp_mq2 = read_mq2();
+  if (temp_mq135 > MQ135_LVL4 || temp_mq2 > MQ2_LVL4) {
     return AIR_SENSOR_STATUS_VERY_BAD;
-  } else if (read_mq135() > MQ135_LVL3 || read_mq2() > MQ2_LVL3) {
+  } else if (temp_mq135 > MQ135_LVL3 || temp_mq2 > MQ2_LVL3) {
     return AIR_SENSOR_STATUS_BAD;
-  } else if (read_mq135() > MQ135_LVL2 || read_mq2() > MQ2_LVL2) {
+  } else if (temp_mq135 > MQ135_LVL2 || temp_mq2 > MQ2_LVL2) {
     return AIR_SENSOR_STATUS_NORMAL;
-  } else if (read_mq135() > MQ135_LVL1 || read_mq2() > MQ2_LVL1) {
-    return AIR_SENSOR_STATUS_NORMAL;
-  } else if (read_mq135() > MQ135_LVL0 || read_mq2() > MQ2_LVL0) {
+  } else if (temp_mq135 > MQ135_LVL1 || temp_mq2 > MQ2_LVL1) {
+    return AIR_SENSOR_STATUS_OK;
+  } else {
     return AIR_SENSOR_STATUS_GOOD;
-  } else return AIR_SENSOR_STATUS_VERY_BAD;
+  }
 }
 void debug_air_sensor() {
   Serial.println("************************");
