@@ -5,7 +5,11 @@
 #define wifi_color ILI9341_GREEN
 /*colors*/
 
-
+bool read_pir_sensor();
+uint8_t read_water_sensor_1();
+uint8_t read_water_sensor_2();
+uint8_t read_water_sensor_3();
+uint8_t read_water_alarm();
 /*time values*/
 constexpr uint16_t reconnect_time = 180;  // in sec
 /*time values*/
@@ -30,7 +34,7 @@ void init_inet() {
     Serial.println("Connecting to WiFi..");
   }
 }
-void handleNewMessages(int numNewMessages) {
+void read_wifi_status() {
   static uint16_t cnt = 0;
   if (WiFi.status() == WL_CONNECTED) {
     tft.drawBitmap(x_start_wifi, y_start_wifi, wifi_on, w_wifi, h_wifi, wifi_background, wifi_color);
@@ -42,13 +46,14 @@ void handleNewMessages(int numNewMessages) {
       cnt = 0;
     }
   }
-
+}
+void handleNewMessages(int numNewMessages) {
   Serial.println("handleNewMessages");
   Serial.println(String(numNewMessages));
-
+String chat_id;
   for (int i = 0; i < numNewMessages; i++) {
     // Chat id of the requester
-    String chat_id = String(bot.messages[i].chat_id);
+    chat_id = String(bot.messages[i].chat_id);
     if (chat_id != CHAT_ID) {
       bot.sendMessage(chat_id, "Unauthorized user", "");
       continue;
@@ -65,11 +70,19 @@ void handleNewMessages(int numNewMessages) {
       String welcome = "Willkommen in der Küche, " + from_name + ".\n";
       welcome += "Verwenden Sie die folgenden Befehle.\n\n";
       welcome += "/check_kitchen zur Überprüfung der Sensoren in der Küche. \n";
+      welcome += "/standby10 oder /standby60 um die sleeptime zu verändern. \n";
+      welcome += "/beep für den Ton. \n";
       bot.sendMessage(chat_id, welcome, "");
     }
     if (text == "/beep") {
       beep();
       beep();
+    }
+    if (text == "/standby10") {
+      set_standby_time(10);
+    }
+    if (text == "/standby60") {
+      set_standby_time(60);
     }
     if (text == "/check_kitchen") {
       String message = "Die Temperatur in der Küche beträgt: " + String(dht.readTemperature()) + " ºC \n";
@@ -94,7 +107,7 @@ void handleNewMessages(int numNewMessages) {
       message += "MQ2 " + String(read_mq2()) + " ppm \n";
       message += "MQ135 " + String(read_mq135()) + " ppm \n";
       ////
-      if (active_pir_sensor()) {
+      if (read_pir_sensor() == true) {
         message += "In der Küche ist jemand. \n";
       } else {
         message += "In der Küche ist niemand. \n";
@@ -102,24 +115,24 @@ void handleNewMessages(int numNewMessages) {
       ////
       message += "Leckage-Sensoren: \n";
       message += "Die Feuchtigkeit unter dem Kühlschrank beträgt: " + String(read_water_sensor_1()) + " % \n";
-      message += "Die Feuchtigkeit unter der Waschmaschine beträgt: "  + String(read_water_sensor_2()) + " % \n";
-      message += "Die Feuchtigkeit unter dem Waschbecken beträgt: "  + String(read_water_sensor_3()) + " % \n";
+      message += "Die Feuchtigkeit unter der Waschmaschine beträgt: " + String(read_water_sensor_2()) + " % \n";
+      message += "Die Feuchtigkeit unter dem Waschbecken beträgt: " + String(read_water_sensor_3()) + " % \n";
       bot.sendMessage(chat_id, message, "");
+    }
+  }
 
-    }
 
-    if (read_water_sensor_3() > read_water_alarm()) {
-      bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter dem Kühlschrank!!!", "");
-    }
-    if (read_water_sensor_2() > read_water_alarm()) {
-      bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter der Waschmaschine!!!", "");
-    }
-    if (read_water_sensor_1() > read_water_alarm()) {
-      bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit hinter dem Mülleimer!!!", "");
-    }
-    if (dht.readTemperature() > 35 || dht.readHumidity() > 85) {
-      bot.sendMessage(chat_id, "Achtung! Hohe Temperatur/Feuchtigkeit in der Küche!!!", "");
-    }
+  if (read_water_sensor_3() > read_water_alarm()) {
+    bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter dem Kühlschrank!!!", "");
+  }
+  if (read_water_sensor_2() > read_water_alarm()) {
+    bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter der Waschmaschine!!!", "");
+  }
+  if (read_water_sensor_1() > read_water_alarm()) {
+    bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit hinter dem Mülleimer!!!", "");
+  }
+  if (dht.readTemperature() > 35 || dht.readHumidity() > 85) {
+    bot.sendMessage(chat_id, "Achtung! Hohe Temperatur/Feuchtigkeit in der Küche!!!", "");
   }
 }
 #endif

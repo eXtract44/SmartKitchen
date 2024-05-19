@@ -46,6 +46,14 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCK, TFT_R
 
 unsigned long previousMillis = 0;
 constexpr long interval = 1000;  //milisec
+
+void init_pir();
+void init_dht();
+void pir_sensor_to_display();
+void temperature_sensor_to_display();
+void water_sensor_to_display();
+bool read_pir_sensor_delayed();
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Serial ready");
@@ -59,9 +67,12 @@ void setup() {
   init_buzzer();
   init_dht();
   beep();
+  set_brightness(30);
 }
 
 void UPDATE_DISPLAY() {
+  read_wifi_status();
+  //set_brightness_pir();
   pir_sensor_to_display();
   temperature_sensor_to_display();
   air_sensor_to_display();
@@ -71,7 +82,7 @@ void UPDATE_DEBUG() {
   //debug_pir_sensor();
   //debug_temperature_sensor();
   //debug_air_sensor();
-  debug_water_sensor();
+  //debug_water_sensor();
 }
 void loop(void) {
   unsigned long currentMillis = millis();
