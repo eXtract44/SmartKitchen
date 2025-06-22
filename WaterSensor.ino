@@ -10,7 +10,7 @@
 /*colors*/
 
 /*time values*/
-constexpr uint16_t water_interval = 15; //15 in sec
+constexpr uint16_t water_interval = 2; // sec
 /*time values*/
 
 /*coordinates on display*/

@@ -72,11 +72,11 @@ void setup() {
 
 void UPDATE_DISPLAY() {
   read_wifi_status();
+  water_sensor_to_display();
   //set_brightness_pir();
   pir_sensor_to_display();
   temperature_sensor_to_display();
   air_sensor_to_display();
-  water_sensor_to_display();
 }
 void UPDATE_DEBUG() {
   //debug_pir_sensor();

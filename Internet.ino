@@ -50,7 +50,7 @@ void read_wifi_status() {
 void handleNewMessages(int numNewMessages) {
   Serial.println("handleNewMessages");
   Serial.println(String(numNewMessages));
-String chat_id;
+  String chat_id;
   for (int i = 0; i < numNewMessages; i++) {
     // Chat id of the requester
     chat_id = String(bot.messages[i].chat_id);
@@ -119,20 +119,18 @@ String chat_id;
       message += "Die Feuchtigkeit unter dem Waschbecken beträgt: " + String(read_water_sensor_3()) + " % \n";
       bot.sendMessage(chat_id, message, "");
     }
-  }
-
-
-  if (read_water_sensor_3() > read_water_alarm()) {
-    bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter dem Kühlschrank!!!", "");
-  }
-  if (read_water_sensor_2() > read_water_alarm()) {
-    bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter der Waschmaschine!!!", "");
-  }
-  if (read_water_sensor_1() > read_water_alarm()) {
-    bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit hinter dem Mülleimer!!!", "");
-  }
-  if (dht.readTemperature() > 35 || dht.readHumidity() > 85) {
-    bot.sendMessage(chat_id, "Achtung! Hohe Temperatur/Feuchtigkeit in der Küche!!!", "");
+    if (read_water_sensor_3() > read_water_alarm()) {
+      bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter dem Kühlschrank!!!", "");
+    }
+    if (read_water_sensor_2() > read_water_alarm()) {
+      bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit unter der Waschmaschine!!!", "");
+    }
+    if (read_water_sensor_1() > read_water_alarm()) {
+      bot.sendMessage(chat_id, "Achtung! Es gibt eine Undichtigkeit hinter dem Mülleimer!!!", "");
+    }
+    if (dht.readTemperature() > 35 || dht.readHumidity() > 85) {
+      bot.sendMessage(chat_id, "Achtung! Hohe Temperatur/Feuchtigkeit in der Küche!!!", "");
+    }
   }
 }
 #endif
