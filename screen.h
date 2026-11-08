@@ -8,16 +8,47 @@ void textAt(const char* text,int x,int y,uint16_t color,const GFXfont* font=null
 }
 void blit(int y,int height) { tft.drawRGBBitmap(0,y,strip.getBuffer(),320,height); }
 void drawFrame() { tft.fillScreen(BG); for(String &v:screenCache) v=""; }
+void drawNumberWithUnit(const char* value,int x,int baseline,bool temperature) {
+  int16_t bx,by; uint16_t w,h;
+  strip.setFont(&FreeSansBold18pt7b); strip.getTextBounds(value,x,baseline,&bx,&by,&w,&h);
+  // Both units stay inside their 148px column, including -40.0 and 100%.
+  if(w>105) { strip.setFont(&FreeSansBold12pt7b); strip.getTextBounds(value,x,baseline,&bx,&by,&w,&h); }
+  strip.setCursor(x,baseline); strip.setTextColor(INK); strip.print(value);
+  int unitX=bx+w+8;
+  if(temperature) { strip.drawCircle(unitX+2,baseline-14,2,MUTED); textAt("C",unitX+7,baseline,MUTED,&FreeSansBold9pt7b); }
+  else textAt("%",unitX,baseline,MUTED,&FreeSansBold9pt7b);
+}
+void drawStar(int x,int y,bool filled,uint16_t color) {
+  const int8_t px[]={0,2,8,4,5,0,-5,-4,-8,-2};
+  const int8_t py[]={-8,-3,-3,1,7,4,7,1,-3,-3};
+  for(int i=0;i<10;i++) { int j=(i+1)%10;
+    if(filled) strip.fillTriangle(x,y,x+px[i],y+py[i],x+px[j],y+py[j],color);
+    else strip.drawLine(x+px[i],y+py[i],x+px[j],y+py[j],MUTED);
+  }
+}
+void drawPerson(int x,int frame) {
+  strip.fillCircle(x,5,3,COLOR_OK); strip.drawLine(x,9,x,18,COLOR_OK);
+  int step=frame?5:-5;
+  strip.drawLine(x,11,x+step,16,COLOR_OK); strip.drawLine(x,11,x-step,14,COLOR_OK);
+  strip.drawLine(x,18,x+step,26,COLOR_OK); strip.drawLine(x,18,x-step,24,COLOR_OK);
+}
 void updateScreen(const Snapshot &s,uint32_t now) {
   static uint32_t lastDraw=0;
   static int currentBrightness=0;
-  int target=settings.brightness;
+  static uint32_t lastFade=0;
+  int target=settings.brightness; brightnessMode="manual";
   struct tm local;
-  if(settings.night && getLocalTime(&local,0) && Kitchen::nightHour(local.tm_hour,settings.nightStart,settings.nightEnd)) target=settings.nightBrightness;
-  if(settings.autoSleep && Kitchen::elapsed(now,lastMotion,uint32_t(settings.standby)*1000) && !s.alarm && !apActive) target=0;
-  if(s.alarm) target=max(target,70);
+  if(settings.night && getLocalTime(&local,0) && Kitchen::nightHour(local.tm_hour,settings.nightStart,settings.nightEnd)) { target=settings.nightBrightness; brightnessMode="night"; }
+  if(previewBrightness>=0 && !Kitchen::elapsed(now,previewAt,30000)) { target=previewBrightness; brightnessMode="preview"; }
+  else previewBrightness=-1;
+  if(settings.autoSleep && previewBrightness<0 && Kitchen::elapsed(now,lastMotion,uint32_t(settings.standby)*1000) && !s.alarm && !apActive) { target=0; brightnessMode="standby"; }
+  if(s.alarm) { target=max(target,70); brightnessMode="alarm"; }
+  effectiveBrightness=target;
   int pwm=target*255/100;
-  if(currentBrightness!=pwm) { currentBrightness+=constrain(pwm-currentBrightness,-3,3); ledcWrite(16,currentBrightness); }
+  if(Kitchen::elapsed(now,lastFade,10)) {
+    lastFade=now;
+    if(currentBrightness!=pwm) { currentBrightness+=constrain(pwm-currentBrightness,-3,3); ledcWrite(16,currentBrightness); }
+  }
   if(!Kitchen::elapsed(now,lastDraw,250)) return;
   lastDraw=now;
   String head=String(s.alarm)+":"+String(WiFi.status())+":"+String(apActive)+":"+String(otaBusy);
@@ -39,20 +70,35 @@ void updateScreen(const Snapshot &s,uint32_t now) {
   if(s.dhtValid) snprintf(env,sizeof(env),"%.1f C | %.0f %%",s.temperature,s.humidity); else snprintf(env,sizeof(env),"-- C | -- %%");
   if(screenCache[4]!=env) {
     screenCache[4]=env; strip.fillScreen(BG);
-    textAt("TEMPERATUR       FEUCHTE",12,2,MUTED);
+    textAt("TEMPERATUR",12,2,MUTED); textAt("FEUCHTE",174,2,MUTED);
     char b[20]; if(s.dhtValid) snprintf(b,sizeof(b),"%.1f",s.temperature); else strcpy(b,"--");
-    textAt(b,14,41,INK,&FreeSansBold18pt7b); textAt("C",105,21,MUTED,&FreeSansBold9pt7b);
+    drawNumberWithUnit(b,12,41,true);
     if(s.dhtValid) snprintf(b,sizeof(b),"%.0f",s.humidity); else strcpy(b,"--");
-    textAt(b,174,41,INK,&FreeSansBold18pt7b); textAt("%",260,21,MUTED,&FreeSansBold9pt7b); blit(129,48);
+    drawNumberWithUnit(b,174,41,false); blit(129,48);
   }
-  String air=String(s.gasReady)+":"+String(s.gas)+":"+String(s.mq[0])+":"+String(s.mq[1])+":"+String(s.motion);
+  static bool pirSeen=false; static uint32_t pirAt=0;
+  if(s.motion) { pirSeen=true; pirAt=now; }
+  bool pirVisible=pirSeen && !Kitchen::elapsed(now,pirAt,3000);
+  int frame=pirVisible?(now/500)%2:-1;
+  String air=String(s.gasReady)+":"+String(s.gas)+":"+String(s.mqFault[0])+String(s.mqFault[1])+":"+String(s.airStars)+":"+String(frame);
   if(screenCache[5]!=air) {
     screenCache[5]=air; strip.fillScreen(BG);
-    textAt(!s.gasReady?"LUFT: Aufwaermen":s.gas?"LUFT: Sensoralarm":"LUFT: Kein Sensoralarm",12,14,s.gas?RED:!s.gasReady?WARN:COLOR_OK,&FreeSansBold9pt7b);
-    char b[64]; snprintf(b,sizeof(b),"MQ2 %d  MQ135 %d ADC  %s",s.mq[0],s.mq[1],s.motion?"PIR":""); textAt(b,12,22,MUTED); blit(180,32);
+    bool fault=s.mqFault[0]||s.mqFault[1];
+    textAt(s.gas?"LUFT: ALARM":"LUFTBELASTUNG",12,13,s.gas?RED:INK,&FreeSansBold9pt7b);
+    if(s.gas) textAt(s.mq[0]>=GAS_OFF[0]?"MQ2: Rauch / Gas":"MQ135: starke Reaktion",12,22,RED);
+    else if(!s.gasReady) textAt("Aufwaermen",12,22,WARN);
+    else if(fault) textAt("MQ-Sensor pruefen",12,22,WARN);
+    else if(!s.airStars) textAt("Basis im Web setzen",12,22,WARN);
+    else {
+      uint16_t color=s.airStars>=4?COLOR_OK:s.airStars>=3?WARN:RED;
+      textAt(s.airStars==5?"Basisniveau":s.airStars>=3?"Erhoeht":"Lueften",12,22,color);
+      for(int i=0;i<5;i++) drawStar(194+i*20,11,i<s.airStars,color);
+    }
+    if(pirVisible) drawPerson(300,frame);
+    blit(180,32);
   }
   String footer=apActive?apName+"\n"+settings.admin:WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():"Offline: Sensoren aktiv";
-  if(!s.dhtValid && now>10000 && !apActive) footer="DHT: Sensor pruefen";
+
   if(screenCache[6]!=footer) {
     screenCache[6]=footer; strip.fillScreen(BG);
     if(apActive) {

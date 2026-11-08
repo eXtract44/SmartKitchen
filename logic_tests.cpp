@@ -36,3 +36,9 @@ constexpr bool debounceTest() {
   return !w.update(5,1500);
 }
 static_assert(debounceTest(),"Noise must not trigger or clear wet alarm");
+static_assert(Kitchen::combinedStars(200,200,200,200)==5);
+static_assert(Kitchen::combinedStars(500,200,200,200)==1);
+static_assert(Kitchen::combinedStars(200,500,200,200)==1,"No averaging can hide either channel");
+static_assert(Kitchen::combinedStars(200,200,0,200)==0,"No rating without a baseline");
+static_assert(Kitchen::airStars(19)==5 && Kitchen::airStars(20)==4 && Kitchen::airStars(40)==3);
+static_assert(Kitchen::airStars(75)==2 && Kitchen::airStars(125)==1);

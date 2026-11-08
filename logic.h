@@ -3,6 +3,11 @@
 
 namespace Kitchen {
 constexpr uint32_t WARMUP_MS = 180000;
+constexpr int airRise(int raw,int baseline) { return baseline>8 && raw>baseline?(raw-baseline)*100/baseline:0; }
+constexpr int airStars(int rise) { return rise<20?5:rise<40?4:rise<75?3:rise<125?2:1; }
+constexpr int combinedStars(int a,int b,int baseA,int baseB) {
+  return baseA<=8||baseB<=8?0:airStars(airRise(a,baseA)>airRise(b,baseB)?airRise(a,baseA):airRise(b,baseB));
+}
 constexpr bool elapsed(uint32_t now, uint32_t then, uint32_t interval) { return uint32_t(now-then)>=interval; }
 constexpr int waterPercent(int raw, int wet) {
   int n=(4095-raw)*100/(4095-wet);

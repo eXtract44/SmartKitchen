@@ -61,7 +61,7 @@ bool intArg(const char* name,int low,int high,int &value) {
 void sendStatus() {
   if(!authenticateRequest()) return;
   Snapshot s=snapshot(); TelegramStatus tg=telegramStatus();
-  StaticJsonDocument<2048> doc;
+  StaticJsonDocument<3072> doc;
   doc["version"]=VERSION; doc["ip"]=WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():WiFi.softAPIP().toString();
   doc["uptime"]=millis()/1000; doc["heap"]=ESP.getFreeHeap(); doc["rssi"]=WiFi.status()==WL_CONNECTED?WiFi.RSSI():0;
   doc["motion"]=s.motion; doc["dhtValid"]=s.dhtValid;
@@ -70,6 +70,11 @@ void sendStatus() {
   JsonArray water=doc.createNestedArray("water");
   for(int i=0;i<3;i++) { auto w=water.createNestedObject(); w["percent"]=s.water[i]; w["wet"]=s.wet[i]; w["fault"]=s.waterFault[i]; }
   auto mq=doc.createNestedArray("mq"); mq.add(s.mq[0]); mq.add(s.mq[1]);
+  auto air=doc.createNestedObject("air"); air["stars"]=s.airStars; air["fault"]=s.mqFault[0]||s.mqFault[1]; air["stable"]=s.mqStable;
+  auto base=air.createNestedArray("baseline"); base.add(s.mqBaseline[0]); base.add(s.mqBaseline[1]);
+  auto smooth=air.createNestedArray("filtered"); smooth.add(s.mqFiltered[0]); smooth.add(s.mqFiltered[1]);
+  auto display=doc.createNestedObject("display"); display["effectiveBrightness"]=effectiveBrightness; display["mode"]=brightnessMode;
+  display["pwmOK"]=backlightPwmOK; display["pwmDuty"]=ledcRead(16); display["pwmHz"]=ledcReadFreq(16);
   doc["alarm"]=s.alarm; doc["alarmText"]=alarmDescription(s.alarm);
   auto bot=doc.createNestedObject("telegram"); bot["configured"]=tg.configured; bot["online"]=tg.online; bot["failures"]=tg.failures; bot["lastOk"]=tg.lastOk;
   auto cfg=doc.createNestedObject("settings"); cfg["brightness"]=settings.brightness; cfg["nightBrightness"]=settings.nightBrightness;
@@ -126,12 +131,27 @@ void setupWeb() {
   const char* headers[]={"X-Kitchen-Control","Origin","X-Firmware-Size"}; web.collectHeaders(headers,3);
   web.on("/",HTTP_GET,[]{ if(!authenticateRequest()) return; web.sendHeader("X-Frame-Options","DENY"); web.sendHeader("Content-Security-Policy","default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"); web.send_P(200,"text/html; charset=utf-8",MOBILE_UI); });
   web.on("/api/status",HTTP_GET,sendStatus);
+  web.on("/api/display/preview",HTTP_POST,[]{
+    if(!authenticateRequest(true)) return;
+    int value; if(!intArg("brightness",5,100,value)) { web.send(400,"text/plain","Invalid brightness"); return; }
+    previewBrightness=value; previewAt=millis(); lastMotion=previewAt; jsonOK();
+  });
+  web.on("/api/air/baseline",HTTP_POST,[]{
+    if(!authenticateRequest(true)) return;
+    if(web.arg("confirm")!="1") { web.send(400,"text/plain","Fresh-air confirmation required"); return; }
+    Snapshot s=snapshot();
+    if(!s.gasReady||!s.mqStable||s.mqFault[0]||s.mqFault[1]||s.gas||Kitchen::elapsed(millis(),s.sampled,500)) { web.send(409,"text/plain","Wait for warm, stable sensors without gas alarm"); return; }
+    if(prefs.putUShort("mqBase2",s.mqFiltered[0])!=sizeof(uint16_t)||prefs.putUShort("mqBase135",s.mqFiltered[1])!=sizeof(uint16_t)) { web.send(503,"text/plain","Cannot save baseline"); return; }
+    portENTER_CRITICAL(&stateMux); for(int i=0;i<2;i++) referenceMq[i]=s.mqFiltered[i]; portEXIT_CRITICAL(&stateMux);
+    jsonOK();
+  });
   web.on("/api/display",HTTP_POST,[]{
     if(!authenticateRequest(true)) return;
     int bri,nightBri,standby,from,to;
     if(!intArg("brightness",5,100,bri)||!intArg("nightBrightness",1,100,nightBri)||!intArg("standby",10,3600,standby)||!intArg("nightStart",0,23,from)||!intArg("nightEnd",0,23,to)) { web.send(400,"text/plain","Invalid display settings"); return; }
     settings.brightness=bri; settings.nightBrightness=nightBri; settings.standby=standby; settings.nightStart=from; settings.nightEnd=to;
-    settings.autoSleep=web.arg("autoSleep")=="1"; settings.night=web.arg("night")=="1"; saveDisplaySettings(); jsonOK();
+    settings.autoSleep=web.arg("autoSleep")=="1"; settings.night=web.arg("night")=="1"; saveDisplaySettings();
+    previewBrightness=bri; previewAt=millis(); lastMotion=previewAt; jsonOK();
   });
   web.on("/api/command",HTTP_POST,[]{ if(!authenticateRequest(true)) return; Command c;
     if(web.arg("command")=="beep") c=BEEP; else if(web.arg("command")=="wake") c=WAKE; else { web.send(400,"text/plain","Unknown command"); return; }

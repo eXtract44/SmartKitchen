@@ -27,7 +27,7 @@
 #define INITIAL_WIFI_PASSWORD ""
 #endif
 
-constexpr char VERSION[]="2.0.0";
+constexpr char VERSION[]="2.1.0";
 constexpr int WATER_PINS[]={39,34,35}, WET_RAW[]={1700,1650,1900};
 constexpr int MQ_PINS[]={32,33};
 // Same raw thresholds as the former linear mapping at 3500; not calibrated ppm.
@@ -50,7 +50,15 @@ struct Snapshot {
   bool dhtValid=false,motion=false,gasReady=false,gas=false;
   float temperature=NAN,humidity=NAN;
   uint16_t alarm=0;
+  int mqFiltered[2]={},mqBaseline[2]={};
+  bool mqFault[2]={true,true},mqStable=false;
+  uint8_t airStars=0;
 };
+int referenceMq[2]={};
+int previewBrightness=-1,effectiveBrightness=0;
+uint32_t previewAt=0;
+const char* brightnessMode="manual";
+bool backlightPwmOK=false;
 Snapshot sharedState;
 portMUX_TYPE stateMux=portMUX_INITIALIZER_UNLOCKED;
 QueueHandle_t tgConfigQueue,commandQueue,alarmQueue;
@@ -84,6 +92,7 @@ void loadSettings() {
   settings.brightness=constrain(prefs.getUChar("bri",65),5,100); settings.nightBrightness=constrain(prefs.getUChar("nightBri",15),1,100);
   settings.standby=constrain(prefs.getUShort("sleepSec",60),10,3600); settings.autoSleep=prefs.getBool("autoSleep",true);
   settings.night=prefs.getBool("night",true); settings.nightStart=constrain(prefs.getUChar("nightFrom",22),0,23); settings.nightEnd=constrain(prefs.getUChar("nightTo",7),0,23);
+  for(int i=0;i<2;i++) referenceMq[i]=prefs.getUShort(i?"mqBase135":"mqBase2",0);
 }
 void saveDisplaySettings() {
   prefs.putUChar("bri",settings.brightness); prefs.putUChar("nightBri",settings.nightBrightness); prefs.putUShort("sleepSec",settings.standby);
@@ -111,6 +120,31 @@ void sampleSensors(uint32_t now) {
     for(int i=0;i<2;i++) { int raw=0; for(int j=0;j<8;j++) raw+=analogRead(MQ_PINS[i]); s.mq[i]=raw/8; }
     s.gasReady=s.gasReady || now>=Kitchen::WARMUP_MS;
     s.gas=s.gasReady && (Kitchen::hysteresis(s.gas,s.mq[0],GAS_ON[0],GAS_OFF[0]) || Kitchen::hysteresis(s.gas,s.mq[1],GAS_ON[1],GAS_OFF[1]));
+    static int filtered[2]={},low[2]={},high[2]={};
+    static bool started=false;
+    static uint32_t stableAt=0,starsAt=0;
+    static int pendingStars=0,previousBase[2]={};
+    bool valid=true;
+    portENTER_CRITICAL(&stateMux);
+    for(int i=0;i<2;i++) s.mqBaseline[i]=referenceMq[i];
+    portEXIT_CRITICAL(&stateMux);
+    for(int i=0;i<2;i++) {
+      filtered[i]=started?(filtered[i]*7+s.mq[i]*16)/8:s.mq[i]*16;
+      s.mqFiltered[i]=filtered[i]/16; s.mqFault[i]=s.mq[i]<=8||s.mq[i]>=4080;
+      if(!started) low[i]=high[i]=s.mqFiltered[i];
+      low[i]=min(low[i],s.mqFiltered[i]); high[i]=max(high[i],s.mqFiltered[i]);
+      if(s.mqFault[i] || high[i]-low[i]>max(8,s.mqFiltered[i]/10)) valid=false;
+    }
+    started=true;
+    if(!valid || !s.gasReady || s.gas) {
+      stableAt=now; for(int i=0;i<2;i++) low[i]=high[i]=s.mqFiltered[i];
+    }
+    s.mqStable=valid && s.gasReady && !s.gas && Kitchen::elapsed(now,stableAt,30000);
+    int target=s.gasReady&&!s.mqFault[0]&&!s.mqFault[1]?Kitchen::combinedStars(s.mqFiltered[0],s.mqFiltered[1],s.mqBaseline[0],s.mqBaseline[1]):0;
+    bool baseChanged=previousBase[0]!=s.mqBaseline[0]||previousBase[1]!=s.mqBaseline[1];
+    for(int i=0;i<2;i++) previousBase[i]=s.mqBaseline[i];
+    if(target!=pendingStars || baseChanged) { pendingStars=target; starsAt=now; }
+    if(target==0 || baseChanged || Kitchen::elapsed(now,starsAt,target<s.airStars?2000:10000)) s.airStars=target;
     s.sampled=now;
   }
   if(Kitchen::elapsed(now,lastDht,2500)) {
@@ -154,8 +188,8 @@ void setup() {
   pinMode(26,INPUT); analogReadResolution(12);
   for(int p:WATER_PINS) { pinMode(p,INPUT); analogSetPinAttenuation(p,ADC_11db); }
   for(int p:MQ_PINS) { pinMode(p,INPUT); analogSetPinAttenuation(p,ADC_11db); }
-  ledcAttach(14,5000,8); ledcWrite(14,0);
-  ledcAttach(16,5000,8); ledcWrite(16,0);
+  ledcAttachChannel(14,5000,8,0); ledcWrite(14,0);
+  backlightPwmOK=ledcAttachChannel(16,1000,8,2); ledcWrite(16,0);
   SPI.begin(18,-1,23,22); tft.begin(20000000); tft.setRotation(3); tft.setTextWrap(false);
   dht.begin(); loadSettings();
   tgConfigQueue=xQueueCreate(1,sizeof(TelegramConfig)); commandQueue=xQueueCreate(8,sizeof(Command)); alarmQueue=xQueueCreate(16,sizeof(AlarmEvent));
